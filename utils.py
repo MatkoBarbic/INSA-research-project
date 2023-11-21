@@ -20,9 +20,9 @@ def normal_psf(input_coordinates: list, sigma_x: float, sigma_y: float, eta: flo
     '''
     input_coordinates = np.array(input_coordinates).reshape(-1, 1)
     mean = np.array([mean_x, mean_y]).reshape(-1, 1)
-    sigma = np.array([[sigma_x, 0], [0, sigma_x]])
+    sigma = np.array([[sigma_x, 0], [0, sigma_y]])
     angle_matrix = np.array([[math.cos(eta), math.sin(eta)], [-math.sin(eta), math.cos(eta)]])
-    cov_matrix = angle_matrix * sigma
+    cov_matrix = angle_matrix @ sigma @ angle_matrix.T
     inv_cov = np.linalg.inv(cov_matrix)
 
     psf = 1/(2 * math.pi * math.sqrt(sigma_x*sigma_y)) * float(np.exp(-1/2 * (input_coordinates - mean).T @ inv_cov @ (input_coordinates - mean)))
