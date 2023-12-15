@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-from utils import downsample, apply_psf
+from utils import downsample, apply_psf, process_pansharp_img
 
 def brovy(pan_img: np.array, rgb_img: np.array, weights: list =[0.33, 0.33, 0.33]):
     '''
@@ -39,6 +39,16 @@ def ihs(pan_img: np.array, rgb_img: np.array):
     sharp_img = cv2.cvtColor(hls_image, cv2.COLOR_HLS2BGR)
     
     return sharp_img
+
+
+def regularize_images(img1, img2):
+    mean_1 = img1.mean()
+    mean_2 = img2.mean()
+    std_1 = img1.std()
+    std_2 = img2.std()
+
+    img1 = ((img1 - mean_1) / std_1) * std_2 + mean_2
+    return img1
 
 
 def projection(v: np.array, u: np.array):
@@ -122,6 +132,7 @@ def gram_schmidt_pan(pan_img: np.array, rgb_img: np.array, weights: list =[0.33,
     # # print(np.allclose(product, identity_matrix))
 
     orth_bands = rgb_img @ orth_basis
+    pan_img = regularize_images(pan_img, orth_bands[:, :, 0])
     orth_bands[:, :, 0] = pan_img
 
     reverse_coefs = np.linalg.inv(orth_basis)
@@ -131,7 +142,7 @@ def gram_schmidt_pan(pan_img: np.array, rgb_img: np.array, weights: list =[0.33,
     return sharp_img
 
 
-def pansharp_pipeline(img: np.array, psf: np.array, downsampling_factor: int, algorithm: callable):
+def pansharp_pipeline(path_to_image: str, psf: np.array, downsampling_factor: int, algorithm: callable):
     '''
         A function that creates a pansharpening pipeline.
         The pipeline consists of:
@@ -140,7 +151,7 @@ def pansharp_pipeline(img: np.array, psf: np.array, downsampling_factor: int, al
             3. Performing a pansharpening algorithm on the images.
 
         Args:
-            img (np.array[int]): Image on which the pipeline will be performed.
+            path_to_image (str): Path to original pansharpened data.
             psf (np.array[int]): PSF array to be applied to the original image.
             downsampling_factor (int): Factor by which the images is to be downsampled.
             algorithm (callable): A pansharpening algorithm which will be performed on the images.
@@ -150,13 +161,7 @@ def pansharp_pipeline(img: np.array, psf: np.array, downsampling_factor: int, al
             rgb_img (np.array[int]): Downscaled RGB image
             sharp_img (np.array[int]): Pansharpened image.
     '''
-    img = apply_psf(img=img, psf=psf)
-    
-    pan_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    pan_img = downsample(img=pan_img, factor=downsampling_factor)
-
-    rgb_img = downsample(img=img, factor=downsampling_factor * 2) ## TODO: Find the exact formula to calculate RGB downsampling factor from grayscale downsampling factor
-    rgb_img = cv2.resize(rgb_img, (pan_img.shape))
+    pan_img, rgb_img, original_img = process_pansharp_img(path_to_image=path_to_image, psf=psf)
 
     sharp_img = algorithm(pan_img=pan_img, rgb_img=rgb_img)
 

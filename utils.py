@@ -6,7 +6,8 @@ import os
 import matplotlib.pyplot as plt
 import rasterio
 from rasterio.enums import Resampling
-
+import cv2
+import pandas as pd
 
 def normal_psf(input_coordinates: list, sigma_x: float, sigma_y: float, eta: float, mean_x: float = 0, mean_y: float = 0):
     '''
@@ -154,42 +155,127 @@ def create_tiles(path_to_image: str, output_folder: str, tile_size: int, overlap
     Returns:
         None
     '''
-    # Open the input raster image using rasterio
     with rasterio.open(path_to_image) as src:
-        # Calculate the number of rows and columns for tiles
         num_rows = (src.height - overlap) // (tile_size - overlap)
         num_cols = (src.width - overlap) // (tile_size - overlap)
+        
+        image_name = path_to_image.split("/")[-1].split(".")[0]
+        # color_code = color_coding.query("image == @image_name")["color_coding"].iloc[0]
 
-        # Iterate over rows and columns to create tiles
         for row in range(num_rows):
             for col in range(num_cols):
-                # Define a window for each tile
                 window = rasterio.windows.Window(
                     col * (tile_size - overlap),
                     row * (tile_size - overlap),
                     tile_size, tile_size
                 )
 
-                # Read the data for the tile
-                tile_data = src.read(window=window)
+                ## Remove the infrared component if it is present
+                # try:
+                # if color_code == "bgr":
+                #     tile_data = src.read(window=window, indexes=(3, 2, 1))
+                # else:
+                tile_data = src.read(window=window, indexes=(1, 2, 3))
+            
+                ## Allow for tiling of grayscale images
+                # except:
+                #     tile_data = src.read(window=window)
 
-                # Create a new dataset profile for the tile
                 tile_profile = src.profile.copy()
                 tile_profile.update({
                     'width': tile_size,
                     'height': tile_size,
                     'transform': src.window_transform(window),
-                    'driver': 'JPEG',  # Specify the driver for JPEG format
-                    'count': 3 if len(src.shape) == 3 else 1,  # 3 bands for RGB, adjust as needed
-                    'dtype': 'uint8',  # Use uint8 for JPG images
+                    'driver': 'PNG',
+                    'count': 3 if src.count == 3 or src.count == 4 else 1,
+                    'dtype': 'uint16',
                 })
 
                 if not os.path.isdir(output_folder):
                     os.makedirs(output_folder)
 
-                # Define the output path for the tile
-                output_path = os.path.join(output_folder, f'tile_{row}_{col}.jpg')
+                img_name = path_to_image.split("/")[-1].split(".")[0]
+                output_path = os.path.join(output_folder, f'{img_name}_tile_{row}_{col}.png')
 
-                # Write the tile data to a new JPEG file
-                with rasterio.open(output_path, 'w', **tile_profile) as dst:
-                    dst.write(tile_data.astype('uint8'))  # Ensure data type is uint8 for JPEG
+                if np.mean(tile_data) > 10:
+                    ## Normalise images
+                    # norm_tile_data = 255 * np.divide(tile_data, np.amax(tile_data))
+                    
+                    with rasterio.open(output_path, 'w', **tile_profile) as dst:
+                        dst.write(tile_data.astype('uint16'))
+
+
+def process_pansharp_img(path_to_image: str, psf: np.array, downscale_factor: int = 5):
+    '''
+        A function that preprocesses pansharpened image data.
+        
+        The pipeline consists of:
+            1. Applying the PSF to the image.
+            2. Downscaling the image.
+            3. Creating a grayscale image.
+            4. Creating a low-resolution RGB image.
+        
+        Args:
+            path_to_image (str): Path to original pansharpened data.
+            psf (np.array[int]): The point spread function.
+            downscale_factor (int): Downscaling factor for the panchromatic image.
+        
+        Returns:
+            pan_img (np.array[int]): Downscaled panchromatic image.
+            rgb_img (np.array[int]): Downscaled RGB image
+            sharp_img (np.array[int]): Pansharpened image.
+    '''
+    sharp_img = cv2.imread(path_to_image)
+    sharp_img = apply_psf(img=sharp_img, psf=psf)
+
+    rgb_img = downsample(img=sharp_img, factor=downscale_factor * 2)
+
+    sharp_img = downsample(img=sharp_img, factor=downscale_factor)
+    pan_img = cv2.cvtColor(sharp_img, cv2.COLOR_BGR2GRAY)
+
+    rgb_img = cv2.resize(rgb_img, (pan_img.shape))
+
+    return pan_img, rgb_img, sharp_img
+
+
+def data_augmentation_pipeline(path_to_data: str, psf: np.array, path_to_pansharp: str, path_to_rgb: str, path_to_panchrom: str, downscale_factor: int = 5):
+    '''
+        A function that prepares the data for training.
+        
+        The pipeline consists of:
+            1. Reading all the data in the folder and filtering non-image data.
+            2. Applying the PSF to the image.
+            3. Downscaling the image.
+            4. Creating a grayscale image.
+            5. Creating a low-resolution RGB image.
+            6. Saving all the images into designated folders.
+        
+        Args:
+            path_to_data (str): Path to original pansharpened data.
+            psf (np.array[int]): The point spread function.
+            path_to_pansharp (str): Path where the pansharpened data is to be saved.
+            path_to_rgb (str): Path where the rgb data is to be saved.
+            path_to_panchrom (str): Path where the panchromating data is to be saved.
+            downscale_factor (int): Downscaling factor for the panchromatic image.
+        
+        Returns:
+            None
+    '''
+    if not os.path.isdir(path_to_pansharp):
+        os.makedirs(path_to_pansharp)
+
+    if not os.path.isdir(path_to_rgb):
+        os.makedirs(path_to_rgb)
+
+    if not os.path.isdir(path_to_panchrom):
+        os.makedirs(path_to_panchrom)
+
+    for img_path in os.listdir(path_to_data):
+        if img_path[-3:] != "xml":
+            full_path_to_img = os.path.join(path_to_data, img_path)
+            pan_img, rgb_img, sharp_img = process_pansharp_img(path_to_image=full_path_to_img, psf=psf, downscale_factor=downscale_factor)
+
+            cv2.imwrite(os.path.join(path_to_pansharp, img_path), sharp_img)
+            cv2.imwrite(os.path.join(path_to_rgb, img_path), rgb_img)
+            cv2.imwrite(os.path.join(path_to_panchrom, img_path), pan_img)
+
