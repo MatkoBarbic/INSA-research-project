@@ -8,6 +8,10 @@ import rasterio
 from rasterio.enums import Resampling
 import cv2
 import pandas as pd
+from scipy.stats import pearsonr
+from skimage.metrics import structural_similarity
+from skimage.metrics import mean_squared_error
+from tqdm import tqdm
 
 def normal_psf(input_coordinates: list, sigma_x: float, sigma_y: float, eta: float, mean_x: float = 0, mean_y: float = 0):
     '''
@@ -270,8 +274,10 @@ def data_augmentation_pipeline(path_to_data: str, psf: np.array, path_to_panshar
     if not os.path.isdir(path_to_panchrom):
         os.makedirs(path_to_panchrom)
 
-    for img_path in os.listdir(path_to_data):
-        if img_path[-3:] != "xml":
+    processed_images = os.listdir(path_to_panchrom)
+
+    for img_path in tqdm(os.listdir(path_to_data)):
+        if img_path[-3:] != "xml" and img_path not in processed_images:
             full_path_to_img = os.path.join(path_to_data, img_path)
             pan_img, rgb_img, sharp_img = process_pansharp_img(path_to_image=full_path_to_img, psf=psf, downscale_factor=downscale_factor)
 
@@ -279,3 +285,38 @@ def data_augmentation_pipeline(path_to_data: str, psf: np.array, path_to_panshar
             cv2.imwrite(os.path.join(path_to_rgb, img_path), rgb_img)
             cv2.imwrite(os.path.join(path_to_panchrom, img_path), pan_img)
 
+
+def get_pansharpening_scores(img1: np.array, img2: np.array):
+    '''
+        A function that calculates the simalarity between two images.
+
+        The scores are calculated by:
+            1. Pearson correlation
+            2. Structural similarity (SSIM)
+            3. Mean squared error (MSE)
+
+        Args:
+            img1 (np.array[int]): The first image.
+            img2 (np.array[int]): The second image.
+        
+        Returns:
+            (pd.DataFrame): The DataFrame in a form of a pandas Series.
+    '''
+    scores = pd.Series(name="Score")
+
+    img1[np.isnan(img1)] = 0
+    img2[np.isnan(img2)] = 0
+
+    img1_flat = img1.reshape(-1, 3)
+    img2_flat = img2.reshape(-1, 3)
+
+    pearson_scores = []
+    for band in range(3):
+        band_score = pearsonr(img1_flat[:, band], img2_flat[:, band])[0]
+        pearson_scores.append(band_score)
+
+    scores["Pearson"] = np.mean(pearson_scores)
+    scores["SSIM"] = structural_similarity(img1, img2, channel_axis=2, data_range=1)
+    scores["MSE"] = mean_squared_error(img1, img2)
+
+    return scores.to_frame()
