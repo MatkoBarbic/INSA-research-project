@@ -128,7 +128,7 @@ def apply_psf(img: np.array, psf: np.array):
         convolved_channels.append(psf_img)
 
     psf_img = np.stack(convolved_channels, axis=-1)
-    return psf_img.astype(np.uint8)
+    return psf_img.astype(np.uint16)
 
 
 def downsample(img: np.array, factor: int):
@@ -159,55 +159,48 @@ def create_tiles(path_to_image: str, output_folder: str, tile_size: int, overlap
     Returns:
         None
     '''
-    with rasterio.open(path_to_image) as src:
-        num_rows = (src.height - overlap) // (tile_size - overlap)
-        num_cols = (src.width - overlap) // (tile_size - overlap)
-        
-        image_name = path_to_image.split("/")[-1].split(".")[0]
-        # color_code = color_coding.query("image == @image_name")["color_coding"].iloc[0]
+    if not os.path.isdir(output_folder):
+        os.makedirs(output_folder)
 
-        for row in range(num_rows):
-            for col in range(num_cols):
-                window = rasterio.windows.Window(
-                    col * (tile_size - overlap),
-                    row * (tile_size - overlap),
-                    tile_size, tile_size
-                )
+    img_name = path_to_image.split("/")[-1].split(".")[0]
 
-                ## Remove the infrared component if it is present
-                # try:
-                # if color_code == "bgr":
-                #     tile_data = src.read(window=window, indexes=(3, 2, 1))
-                # else:
-                tile_data = src.read(window=window, indexes=(1, 2, 3))
-            
-                ## Allow for tiling of grayscale images
-                # except:
-                #     tile_data = src.read(window=window)
+    processed_images_list = list(set([processed_img_name.split("_tile_")[0] for processed_img_name in os.listdir(output_folder)]))
 
-                tile_profile = src.profile.copy()
-                tile_profile.update({
-                    'width': tile_size,
-                    'height': tile_size,
-                    'transform': src.window_transform(window),
-                    'driver': 'PNG',
-                    'count': 3 if src.count == 3 or src.count == 4 else 1,
-                    'dtype': 'uint16',
-                })
+    if img_name not in processed_images_list:
+        try:
+            with rasterio.open(path_to_image) as src:
+                num_rows = (src.height - overlap) // (tile_size - overlap)
+                num_cols = (src.width - overlap) // (tile_size - overlap)
+                
+                # color_code = color_coding.query("image == @image_name")["color_coding"].iloc[0]
+                
+                for row in range(num_rows):
+                    for col in range(num_cols):
+                        window = rasterio.windows.Window(
+                            col * (tile_size - overlap),
+                            row * (tile_size - overlap),
+                            tile_size, tile_size
+                        )
 
-                if not os.path.isdir(output_folder):
-                    os.makedirs(output_folder)
+                        tile_data = src.read(window=window, indexes=(1, 2, 3))
 
-                img_name = path_to_image.split("/")[-1].split(".")[0]
-                output_path = os.path.join(output_folder, f'{img_name}_tile_{row}_{col}.png')
+                        tile_profile = src.profile.copy()
+                        tile_profile.update({
+                            'width': tile_size,
+                            'height': tile_size,
+                            'transform': src.window_transform(window),
+                            'driver': 'PNG',
+                            'count': 3 if src.count == 3 or src.count == 4 else 1,
+                            'dtype': 'uint16',
+                        })
 
-                if np.mean(tile_data) > 10:
-                    ## Normalise images
-                    # norm_tile_data = 255 * np.divide(tile_data, np.amax(tile_data))
-                    
-                    with rasterio.open(output_path, 'w', **tile_profile) as dst:
-                        dst.write(tile_data.astype('uint16'))
+                        output_path = os.path.join(output_folder, f'{img_name}_tile_{row}_{col}.png')
 
+                        if np.mean(tile_data) != 0:
+                            with rasterio.open(output_path, 'w', **tile_profile) as dst:
+                                dst.write(tile_data.astype('uint16'))
+        except:
+            print(img_name)
 
 def process_pansharp_img(path_to_image: str, psf: np.array, downscale_factor: int = 5):
     '''
@@ -229,7 +222,7 @@ def process_pansharp_img(path_to_image: str, psf: np.array, downscale_factor: in
             rgb_img (np.array[int]): Downscaled RGB image
             sharp_img (np.array[int]): Pansharpened image.
     '''
-    sharp_img = cv2.imread(path_to_image)
+    sharp_img = cv2.imread(path_to_image, cv2.IMREAD_UNCHANGED)
     sharp_img = apply_psf(img=sharp_img, psf=psf)
 
     rgb_img = downsample(img=sharp_img, factor=downscale_factor * 2)
@@ -268,13 +261,13 @@ def data_augmentation_pipeline(path_to_data: str, psf: np.array, path_to_panshar
     if not os.path.isdir(path_to_pansharp):
         os.makedirs(path_to_pansharp)
 
-    if not os.path.isdir(path_to_rgb):
-        os.makedirs(path_to_rgb)
+    # if not os.path.isdir(path_to_rgb):
+    #     os.makedirs(path_to_rgb)
 
-    if not os.path.isdir(path_to_panchrom):
-        os.makedirs(path_to_panchrom)
+    # if not os.path.isdir(path_to_panchrom):
+    #     os.makedirs(path_to_panchrom)
 
-    processed_images = os.listdir(path_to_panchrom)
+    processed_images = os.listdir(path_to_pansharp)
 
     for img_path in tqdm(os.listdir(path_to_data)):
         if img_path[-3:] != "xml" and img_path not in processed_images:
@@ -282,8 +275,8 @@ def data_augmentation_pipeline(path_to_data: str, psf: np.array, path_to_panshar
             pan_img, rgb_img, sharp_img = process_pansharp_img(path_to_image=full_path_to_img, psf=psf, downscale_factor=downscale_factor)
 
             cv2.imwrite(os.path.join(path_to_pansharp, img_path), sharp_img)
-            cv2.imwrite(os.path.join(path_to_rgb, img_path), rgb_img)
-            cv2.imwrite(os.path.join(path_to_panchrom, img_path), pan_img)
+            # cv2.imwrite(os.path.join(path_to_rgb, img_path), rgb_img)
+            # cv2.imwrite(os.path.join(path_to_panchrom, img_path), pan_img)
 
 
 def get_pansharpening_scores(img1: np.array, img2: np.array):

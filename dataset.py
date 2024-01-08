@@ -40,7 +40,7 @@ class PanDataset(torch.utils.data.Dataset):
 
         sharp_img = Image.open(os.path.join(self.path_to_sharp, self.sharp[index]))
         pan_img = sharp_img.convert("L")
-        rgb_img = downsample(np.array(sharp_img), 5)
+        rgb_img = downsample(np.array(sharp_img), 2)
         rgb_img = Image.fromarray(rgb_img).resize(sharp_img.size)
 
         sharp_img = torchvision.transforms.functional.to_tensor(sharp_img)
