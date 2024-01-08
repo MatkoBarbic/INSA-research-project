@@ -96,28 +96,30 @@ if __name__=='__main__':
 	model_path = os.path.join(model_folder, "unet.pth")
 
 	path_to_data = "./data/"
-	path_to_data = path_to_data + "SOTA/"
+	# path_to_data = path_to_data + "SOTA/"
+	path_to_data = path_to_data + "Tiled Pleiades images/sharp/"
+      
 
-	if "SOTA" not in path_to_data:
-		path_to_train = os.path.join(path_to_data, "train")
-		path_to_val = os.path.join(path_to_data, "val")
+	# if "SOTA" not in path_to_data:
+	# 	path_to_train = os.path.join(path_to_data, "train")
+	# 	path_to_val = os.path.join(path_to_data, "val")
 
-		path_to_train_pan = os.path.join(path_to_train, "pan")
-		path_to_train_rgb = os.path.join(path_to_train, "rgb")
-		path_to_train_sharp = os.path.join(path_to_train, "sharp")
+	# 	path_to_train_pan = os.path.join(path_to_train, "pan")
+	# 	path_to_train_rgb = os.path.join(path_to_train, "rgb")
+	# 	path_to_train_sharp = os.path.join(path_to_train, "sharp")
 
-		path_to_val_pan = os.path.join(path_to_val, "pan")
-		path_to_val_rgb = os.path.join(path_to_val, "rgb")
-		path_to_val_sharp = os.path.join(path_to_val, "sharp")
+	# 	path_to_val_pan = os.path.join(path_to_val, "pan")
+	# 	path_to_val_rgb = os.path.join(path_to_val, "rgb")
+	# 	path_to_val_sharp = os.path.join(path_to_val, "sharp")
 
-	else:
-		path_to_train_pan = os.path.join(path_to_data, "pan")
-		path_to_train_rgb = os.path.join(path_to_data, "rgb")
-		path_to_train_sharp = os.path.join(path_to_data, "sharp")
+	# else:
+	path_to_train_pan = os.path.join(path_to_data, "pan")
+	path_to_train_rgb = os.path.join(path_to_data, "rgb")
+	path_to_train_sharp = os.path.join(path_to_data, "sharp")
 
-		path_to_val_pan = os.path.join(path_to_data, "pan")
-		path_to_val_rgb = os.path.join(path_to_data, "rgb")
-		path_to_val_sharp = os.path.join(path_to_data, "sharp")
+	path_to_val_pan = os.path.join(path_to_data, "pan")
+	path_to_val_rgb = os.path.join(path_to_data, "rgb")
+	path_to_val_sharp = os.path.join(path_to_data, "sharp")
 
 	unet = UNet(n_channels=4, n_classes=3).cuda()
 	# train_data = PanDataset(path_to_pan=path_to_train_pan, path_to_rgb=path_to_train_rgb, path_to_sharp=path_to_train_sharp)

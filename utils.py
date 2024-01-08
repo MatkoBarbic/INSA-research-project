@@ -12,6 +12,7 @@ from scipy.stats import pearsonr
 from skimage.metrics import structural_similarity
 from skimage.metrics import mean_squared_error
 from tqdm import tqdm
+import torch
 
 def normal_psf(input_coordinates: list, sigma_x: float, sigma_y: float, eta: float, mean_x: float = 0, mean_y: float = 0):
     '''
@@ -313,3 +314,75 @@ def get_pansharpening_scores(img1: np.array, img2: np.array):
     scores["MSE"] = mean_squared_error(img1, img2)
 
     return scores.to_frame()
+
+
+def evaluate_pansharpening(path_to_images: str, algorithm: callable, train_perc: float, train: bool):
+    '''
+        A function that evaluates a classical pansharpening alhorithm on all scores.
+
+        Args:
+            path_to_images (str): Path to the dataset on which the algorithms should be evaluated.
+            algorithm (callable): Pansharpening algorithm that will be evaluated.
+            train_perc (float): A float between 0 and 1 that represents the percentage of the dataset that is used as training data in deep learning methods.
+            train (bool): Should the algorithms be evaluated on the train dataset.
+        
+        Returns:
+            (pd.DataFrame): A pandas DataFrame containing the scores.
+    '''
+    all_scores = []
+
+    image_paths = sorted(os.listdir(path_to_images))
+    if train:
+        image_paths = image_paths[:int(len(image_paths) * train_perc)]
+    else:
+        image_paths = image_paths[int(len(image_paths) * train_perc): ]
+
+    for image_name in tqdm(image_paths):
+        img = cv2.imread(os.path.join(path_to_images, image_name))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        rgb_img = downsample(img=img, factor=2)
+        pan_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        rgb_img = cv2.resize(rgb_img, (pan_img.shape))
+
+        sharp_img = algorithm(pan_img=pan_img, rgb_img=rgb_img)
+        score = get_pansharpening_scores(img, sharp_img)
+
+        all_scores.append(score)
+
+    all_scores = pd.concat(all_scores, axis=1, ignore_index=True)
+    all_scores = all_scores.mean(axis=1)
+
+    return all_scores
+
+
+def evaluate_model_all_metrics(net, data_loader):
+    '''
+        A function that evaluates a deep learning alhorithm on all scores.
+
+        Args:
+            net: The network that should be evaluated.
+            data_loader: Data loader of the data that should be evaluated.
+        
+        Returns:
+            (pd.DataFrame): A pandas DataFrame containing the scores.
+    '''
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    net.eval()
+    
+    all_scores = []
+
+    with torch.no_grad():
+        for x, y in data_loader:
+            x, y = x.to(device), y.to(device)
+            outputs = net(x)
+
+            for image in outputs:
+                score = get_pansharpening_scores(np.array(image), np.array(y))
+                all_scores.append(score)
+            
+    all_scores = pd.concat(all_scores, axis=1, ignore_index=True)
+    all_scores = all_scores.mean(axis=1)
+
+    return all_scores
