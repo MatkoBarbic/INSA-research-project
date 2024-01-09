@@ -75,8 +75,8 @@ if __name__=='__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--data_path', type=str, default = '../data/landscapes', help='dataset path')
 	parser.add_argument('--batch_size', type=int, default = int(4), help='batch_size')
-	parser.add_argument('--lr', type=float, default = float(1e-3), help='learning rate')
-	parser.add_argument('--epochs', type=int, default = int(10), help='number of epochs')
+	parser.add_argument('--lr', type=float, default = float(1e-4), help='learning rate')
+	parser.add_argument('--epochs', type=int, default = int(100), help='number of epochs')
 	parser.add_argument('--num_workers', type=int, default = int(4), help='number of workers')
 
 	args = parser.parse_args()
@@ -90,14 +90,22 @@ if __name__=='__main__':
 
 	model_folder = "./models/unet/"
 
+	num_gpus = torch.cuda.device_count()
+
+	if num_gpus > 0:
+		print(f"Number of available GPUs: {num_gpus}")
+	else:
+		print("No GPUs available on this system.")
+
 	if not os.path.isdir(model_folder):
 		os.makedirs(model_folder)
 
 	model_path = os.path.join(model_folder, "unet.pth")
 
 	path_to_data = "./data/"
+	print(os.listdir(path_to_data))
 	# path_to_data = path_to_data + "SOTA/"
-	path_to_data = path_to_data + "Tiled Pleiades images/sharp/"
+	path_to_data = path_to_data + "Tiled Pleiades images/"
       
 
 	# if "SOTA" not in path_to_data:
@@ -122,6 +130,7 @@ if __name__=='__main__':
 	path_to_val_sharp = os.path.join(path_to_data, "sharp")
 
 	unet = UNet(n_channels=4, n_classes=3).cuda()
+	# unet.load_state_dict(torch.load(os.path.join(model_folder, "unet_SOTA_best.pth")))
 	# train_data = PanDataset(path_to_pan=path_to_train_pan, path_to_rgb=path_to_train_rgb, path_to_sharp=path_to_train_sharp)
 	# train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 

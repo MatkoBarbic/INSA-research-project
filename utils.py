@@ -316,7 +316,7 @@ def get_pansharpening_scores(img1: np.array, img2: np.array):
     return scores.to_frame()
 
 
-def evaluate_pansharpening(path_to_images: str, algorithm: callable, train_perc: float, train: bool):
+def evaluate_pansharpening(path_to_images: str, algorithm: callable, train_perc: float, train: bool, downsample_rgb: int = 2):
     '''
         A function that evaluates a classical pansharpening alhorithm on all scores.
 
@@ -325,6 +325,7 @@ def evaluate_pansharpening(path_to_images: str, algorithm: callable, train_perc:
             algorithm (callable): Pansharpening algorithm that will be evaluated.
             train_perc (float): A float between 0 and 1 that represents the percentage of the dataset that is used as training data in deep learning methods.
             train (bool): Should the algorithms be evaluated on the train dataset.
+            downsample_rgb (int): Factor by which the rgb image will be degraded.
         
         Returns:
             (pd.DataFrame): A pandas DataFrame containing the scores.
@@ -338,11 +339,11 @@ def evaluate_pansharpening(path_to_images: str, algorithm: callable, train_perc:
         image_paths = image_paths[int(len(image_paths) * train_perc): ]
 
     for image_name in tqdm(image_paths):
-        img = cv2.imread(os.path.join(path_to_images, image_name))
+        img = cv2.imread(os.path.join(path_to_images, image_name), cv2.IMREAD_UNCHANGED)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        rgb_img = downsample(img=img, factor=2)
-        pan_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        rgb_img = downsample(img=img, factor=downsample_rgb)
+        pan_img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         rgb_img = cv2.resize(rgb_img, (pan_img.shape))
 
         sharp_img = algorithm(pan_img=pan_img, rgb_img=rgb_img)
@@ -356,13 +357,14 @@ def evaluate_pansharpening(path_to_images: str, algorithm: callable, train_perc:
     return all_scores
 
 
-def evaluate_model_all_metrics(net, data_loader):
+def evaluate_model_all_metrics(net, data_loader, sota=False):
     '''
         A function that evaluates a deep learning alhorithm on all scores.
 
         Args:
             net: The network that should be evaluated.
             data_loader: Data loader of the data that should be evaluated.
+            sota (bool): Do images come from the SOTA dataset.
         
         Returns:
             (pd.DataFrame): A pandas DataFrame containing the scores.
@@ -377,9 +379,17 @@ def evaluate_model_all_metrics(net, data_loader):
         for x, y in data_loader:
             x, y = x.to(device), y.to(device)
             outputs = net(x)
+            x, y, outputs = x.to("cpu").numpy(), y.to("cpu").numpy(), outputs.to("cpu").numpy()
 
-            for image in outputs:
-                score = get_pansharpening_scores(np.array(image), np.array(y))
+            for image, truth in zip(outputs, y):
+                image = image.transpose((1, 2, 0))
+                truth = truth.transpose((1, 2, 0))
+                
+                if not sota:
+                    score = get_pansharpening_scores(np.array(image) * 4095, np.array(truth) * 4095)
+                else:
+                    score = get_pansharpening_scores(np.array(image) * 255, np.array(truth) * 255)
+
                 all_scores.append(score)
             
     all_scores = pd.concat(all_scores, axis=1, ignore_index=True)

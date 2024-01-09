@@ -34,9 +34,9 @@ def ihs(pan_img: np.array, rgb_img: np.array):
         Returns:
             (np.array[int]): Pansharpened image.
     '''
-    hls_image = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2HLS)
+    hls_image = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HLS)
     hls_image[:, :, 1] = pan_img
-    sharp_img = cv2.cvtColor(hls_image, cv2.COLOR_HLS2BGR)
+    sharp_img = cv2.cvtColor(hls_image, cv2.COLOR_HLS2RGB)
     
     return sharp_img
 
