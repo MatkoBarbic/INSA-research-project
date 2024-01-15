@@ -25,12 +25,20 @@ def evaluate(G, D, val_loader, criterion, L1_lambda):
         for x_val, y_val in val_loader:
             x_val, y_val = x_val.to(device), y_val.to(device)
 
+            if x_val.size()[2] != opt.input_size:
+                x_val = util.imgs_resize(x_val.cpu(), opt.input_size).to(device)
+                y_val = util.imgs_resize(y_val.cpu(), opt.input_size).to(device)
+            
             # Evaluate the generator
             G_result = G(x_val)
             D_result = D(x_val, G_result).squeeze()
 
+            # print(G_result.size())
+            # print(D_result.size())
+            # print(y_val)
+
             D_val_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda()))
-            G_val_loss = criterion(G_result, y_)
+            G_val_loss = criterion(G_result, y_val)
             
             G_combined_loss = D_val_loss + opt.L1_lambda * G_val_loss
 
@@ -51,9 +59,9 @@ parser.add_argument('--ngf', type=int, default=64)
 parser.add_argument('--ndf', type=int, default=64)
 parser.add_argument('--criterion', type=str, default="MSE", help='which loss function to use for the generator. Options are "MSE" or "L1')
 
-parser.add_argument('--input_size', type=int, default=410, help='input size')
-parser.add_argument('--crop_size', type=int, default=410, help='crop size (0 is false)')
-parser.add_argument('--resize_scale', type=int, default=460, help='resize scale (0 is false)')
+parser.add_argument('--input_size', type=int, default=512, help='input size')
+parser.add_argument('--crop_size', type=int, default=512, help='crop size (0 is false)')
+parser.add_argument('--resize_scale', type=int, default=560, help='resize scale (0 is false)')
 
 parser.add_argument('--fliplr', type=bool, default=True, help='random fliplr True or False')
 parser.add_argument('--train_epoch', type=int, default=200, help='number of train epochs')
@@ -68,9 +76,9 @@ opt = parser.parse_args()
 print(opt)
 
 ## Results save path
-path_to_data = "./data/"
-path_to_data = path_to_data + "SOTA/"
-# path_to_data = path_to_data + "Tiled Pleiades images/"
+path_to_data = "../../data/"
+# path_to_data = path_to_data + "SOTA/"
+path_to_data = path_to_data + "Tiled Pleiades images/"
 
 model_folder = "./models/pix2pix/"
 train_hist_folder = "./train_hist/pix2pix/"
@@ -81,9 +89,9 @@ if "SOTA" in path_to_data:
     g_model_path = os.path.join(model_folder, "g_pix2pix_SOTA.pth")
     d_model_path = os.path.join(model_folder, "d_pix2pix_SOTA.pth")
 
-    opt.input_size = 512
-    opt.input_size = 512
-    opt.input_size = 560
+    # opt.input_size = 512
+    # opt.input_size = 512
+    # opt.input_size = 560
 
 else:
     train_hist_folder = os.path.join(train_hist_folder, "Pleiades")
@@ -195,9 +203,9 @@ for epoch in range(opt.train_epoch):
         D_train_loss.backward()
         D_optimizer.step()
 
-        train_hist['D_losses'].append(D_train_loss.data[0])
+        train_hist['D_losses'].append(D_train_loss.item())
 
-        D_losses.append(D_train_loss.data[0])
+        D_losses.append(D_train_loss.item())
 
         # train generator G
         G.zero_grad()
@@ -209,9 +217,9 @@ for epoch in range(opt.train_epoch):
         G_train_loss.backward()
         G_optimizer.step()
 
-        train_hist['G_losses'].append(G_train_loss.data[0])
+        train_hist['G_losses'].append(G_train_loss.item())
 
-        G_losses.append(G_train_loss.data[0])
+        G_losses.append(G_train_loss.item())
 
         val_loss, G_test_loss, D_test_loss = evaluate(G=G, D=D, val_loader=test_loader, criterion=criterion, L1_lambda=opt.L1_lambda)
 

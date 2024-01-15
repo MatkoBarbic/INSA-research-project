@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import argparse
-from unet import UNet
+from unet_large import UNet
 from torch.utils.data import DataLoader
 import os
 import sys
@@ -70,14 +70,12 @@ def train(net, optimizer, train_loader, val_loader, model_path, epochs=5, writer
 if __name__=='__main__':
 	torch.cuda.empty_cache()
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--data_path', type=str, default = '../data/landscapes', help='dataset path')
 	parser.add_argument('--batch_size', type=int, default = int(4), help='batch_size')
 	parser.add_argument('--lr', type=float, default = float(1e-4), help='learning rate')
 	parser.add_argument('--epochs', type=int, default = int(100), help='number of epochs')
 	parser.add_argument('--num_workers', type=int, default = int(4), help='number of workers')
 
 	args = parser.parse_args()
-	data_path = args.data_path
 	batch_size = args.batch_size
 	lr = args.lr
 	epochs = args.epochs
@@ -97,7 +95,7 @@ if __name__=='__main__':
 	if not os.path.isdir(model_folder):
 		os.makedirs(model_folder)
 
-	model_path = os.path.join(model_folder, "unet.pth")
+	model_path = os.path.join(model_folder, "unet_SOTA_large.pth")
 
 	path_to_data = "./data/"
 	path_to_data = path_to_data + "SOTA/"

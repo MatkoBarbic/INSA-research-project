@@ -2,8 +2,7 @@ import itertools, imageio, torch
 import matplotlib.pyplot as plt
 import numpy as np
 from torchvision import datasets
-from scipy.misc import imresize
-
+import cv2
 def show_result(G, x_, y_, num_epoch, show = False, save = False, path = 'result.png'):
     # G.eval()
     test_images = G(x_)
@@ -81,8 +80,10 @@ def data_load(path, subfolder, transform, batch_size, shuffle=True):
 def imgs_resize(imgs, resize_scale = 286):
     outputs = torch.FloatTensor(imgs.size()[0], imgs.size()[1], resize_scale, resize_scale)
     for i in range(imgs.size()[0]):
-        img = imresize(imgs[i].numpy(), [resize_scale, resize_scale])
-        outputs[i] = torch.FloatTensor((img.transpose(2, 0, 1).astype(np.float32).reshape(-1, imgs.size()[1], resize_scale, resize_scale) - 127.5) / 127.5)
+        img = imgs[i].permute(1, 2, 0).numpy()
+        img = cv2.resize(img, [resize_scale, resize_scale])
+        img = torch.from_numpy(img).permute(2, 0, 1)
+        outputs[i] = torch.FloatTensor((img.float() - 127.5) / 127.5)
 
     return outputs
 
