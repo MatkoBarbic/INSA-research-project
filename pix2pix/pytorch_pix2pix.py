@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from unet import UNet
 
 import sys
 
@@ -40,7 +41,7 @@ def evaluate(G, D, val_loader, criterion, L1_lambda):
             D_val_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda()))
             G_val_loss = criterion(G_result, y_val)
             
-            G_combined_loss = D_val_loss + opt.L1_lambda * G_val_loss
+            G_combined_loss = D_val_loss + L1_lambda * G_val_loss
 
             val_loss += G_combined_loss.item()
 
@@ -95,7 +96,7 @@ if "SOTA" in path_to_data:
 
 else:
     train_hist_folder = os.path.join(train_hist_folder, "Pleiades")
-    model_folder = os.path.join(model_folder, "")
+    model_folder = os.path.join(model_folder, "Pleiades")
     g_model_path = os.path.join(model_folder, "g_pix2pix_pleiades.pth")
     d_model_path = os.path.join(model_folder, "d_pix2pix_pleiades.pth")
 
@@ -135,9 +136,10 @@ test = test_loader.__iter__().__next__()[0]
 img_size = test.size()[2]
 
 # network
-G = network.generator(opt.ngf)
+G = UNet(n_channels=4, n_classes=3)
+# G = network.generator(opt.ngf)
 D = network.discriminator(opt.ndf)
-G.weight_init(mean=0.0, std=0.02)
+# G.weight_init(mean=0.0, std=0.02)
 D.weight_init(mean=0.0, std=0.02)
 G.cuda()
 D.cuda()
@@ -235,8 +237,7 @@ for epoch in range(opt.train_epoch):
     print('[%d/%d] - ptime: %.2f, train_loss_d: %.7f, train_loss_g: %.7f' % ((epoch + 1), opt.train_epoch, per_epoch_ptime, torch.mean(torch.FloatTensor(D_losses)),
                                                               torch.mean(torch.FloatTensor(G_losses))))
     
-    print('[%d/%d] - val_loss_d: %.7f, val_loss_g: %.7f' % ((epoch + 1), opt.train_epoch, torch.FloatTensor(D_test_loss),
-                                                              torch.FloatTensor(G_test_loss)))
+    print('[%d/%d] - val_loss_d: %.7f, val_loss_g: %.7f' % ((epoch + 1), opt.train_epoch, D_test_loss, G_test_loss))
     
     # fixed_p = root + 'Fixed_results/' + model + str(epoch + 1) + '.png'
     # util.show_result(G, Variable(fixed_x_.cuda(), volatile=True), fixed_y_, (epoch+1), save=True, path=fixed_p)

@@ -121,7 +121,7 @@ if __name__=='__main__':
 	train_data = PanDataset(path_to_pan=path_to_train_pan, path_to_rgb=path_to_train_rgb, path_to_sharp=path_to_train_sharp, train_perc=train_perc, train=True, downsample_rgb=downscale_factor)
 	train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
-	val_data = PanDataset(path_to_pan=path_to_val_pan, path_to_rgb=path_to_val_rgb, path_to_sharp=path_to_val_sharp, train_perc=1 - train_perc, train=True, downsample_rgb=downscale_factor)
+	val_data = PanDataset(path_to_pan=path_to_val_pan, path_to_rgb=path_to_val_rgb, path_to_sharp=path_to_val_sharp, train_perc=1 - train_perc, train=False, downsample_rgb=downscale_factor)
 	val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
 	optimizer = optim.Adam(unet.parameters(), lr=lr)

@@ -14,9 +14,9 @@ class PanDataset(torch.utils.data.Dataset):
         self.downsample_rgb = downsample_rgb
 
         self.train = train
+        self.train_split = round(len(os.listdir(self.path_to_sharp)) * train_perc)
 
         if train:
-          self.train_split = round(len(os.listdir(self.path_to_sharp)) * train_perc)
           self.sharp = sorted(os.listdir(self.path_to_sharp))[: self.train_split]
 
         else:
